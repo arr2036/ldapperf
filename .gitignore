@@ -31,3 +31,9 @@
 
 # Random
 .DS_Store
+
+# Test filtes
+test_*
+
+# Build products
+ldapperf

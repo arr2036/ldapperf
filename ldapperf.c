@@ -83,20 +83,23 @@ typedef struct lp_name {
 #define USEC 1000000
 #define TIMEVAL_TO_FLOAT(_x) ((_x).tv_sec + ((_x).tv_usec / 1000000.0))
 
-#define DEBUG(fmt, ...) do { if (debug) printf(fmt "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
+#define DEBUG(fmt, ...) do { if (debug > 0) printf(fmt "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
+#define DEBUG2(fmt, ...) do { if (debug > 1) printf(fmt "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
 #define INFO(fmt, ...) do { printf(VTC_BOLD fmt "\n" VTC_RESET, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define ERROR(fmt, ...) do { fprintf(stderr, VTC_RED "ERROR: " fmt "\n" VTC_RESET, ## __VA_ARGS__); fflush(stderr); } while (0)
 
-#define TDEBUG(fmt, ...) do { if (debug) printf("(%03i) " fmt "\n", thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
+#define TDEBUG(fmt, ...) do { if (debug > 0) printf("(%03i) " fmt "\n", thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define TINFO(fmt, ...) do { printf(VTC_BOLD "(%03i) " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define TERROR(fmt, ...) do { fprintf(stderr, VTC_RED "(%03i) ERROR: " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stderr); } while (0)
 
-#define REPLACE_CHAR '@'					//!< The char to substitute in the filter and/or DN.
+#define SUBST_CHAR '@'						//!< The char to substitute in the filter and/or DN.
 
-bool debug		= false;				//!< Default configuration options.
+int debug		= 0;					//!< Default configuration options.
 bool decode_entry	= false;				//!< Do a scan of the results return through the ldap server. This is client side !
 bool rebind		= false;				//!< Rebind after every search.
 bool do_stats		= false;				//!< Print statistics at the end of the test.
+bool ordered		= false;				//!< Perform searches for names from -r <file> in order to prime the cache.
+
 char const *ldap_host	= "127.0.0.1";				//!< The host where the ldap server resides.
 int ldap_port		= 389;					//!< The port to connect to.
 char const *bind_dn	= NULL;					//!< Manager bind DN.
@@ -112,7 +115,7 @@ bool do_subst		= false;				//!< Whether we're going to perform substitution on t
 								//!< base DN or filter.
 
 int scope		= LDAP_SCOPE_ONE;			//!< Scope of the search,
-int run_count		= 10;					//!< How many searches to execute.
+int num_loops		= 10;					//!< How many searches to execute.
 int num_pthreads	= 5;					//!< How many threads there should be.
 char *names_file        = NULL;					//!< File containing names to substitute.
 int time_out		= 10; 					//!< 10 second connection/search time_out,
@@ -121,7 +124,7 @@ int version		= LDAP_VERSION3;
 lp_name_t *names	= NULL;
 int names_cnt		= 0;
 
-void usage(char const *path)
+void usage(char const *path, int code)
 {
 	char const *prog;
 
@@ -129,18 +132,19 @@ void usage(char const *path)
 	prog = prog ? prog + 1: path;
 
 	printf("%s -b <base_dn> [options]\n", prog);
-	printf("  -v             Output more debugging information\n");
+	printf("  -v             Output more debugging information. Use multiple times to increase verbosity\n");
 	printf("  -s             Decode received entry (default no)\n");
 	printf("  -S             Print statistics after all queries have completed\n");
 	printf("  -H <host>      Host to connect to (default 127.0.0.1)\n");
 	printf("  -p <port>      Port to connect on (default 389)\n");
+	printf("  -o <ordered>   Search for each of the names in the -r <file> in order, using a single thread");
 	printf("  -D <dn>        Bind DN\n");
 	printf("  -w <pasword>   Bind password\n");
 	printf("\nSearch options:\n");
 	printf("  -b <base_dn>   DN to start the search from ('%c' will be replaced with "
-	       "a random name from -r <file>)\n", REPLACE_CHAR);
+	       "a name from -r <file>)\n", SUBST_CHAR);
 	printf("  -f <filter>    Filter to use when searching ('%c' will be replaced with "
-	       "a random name from -r <file>)\n", REPLACE_CHAR);
+	       "a name from -r <file>)\n", SUBST_CHAR);
 	printf("  -l <loops>     How many searches a thread should perform\n");
 	printf("  -t <threads>   How many threads we should spawn\n");
 	printf("  -r <file>      List of names to use when searching\n");
@@ -148,6 +152,8 @@ void usage(char const *path)
 	printf("\nExample:\n");
 	printf("  %s -H 127.0.0.1 -p 389 -D \"cn=manager,dc=example,dc=org\" -w \"letmein\" "
 	       "-b \"dc=example,dc=org\" -s\n", prog);
+
+	exit(code);
 }
 
 /** Subtract one timeval struct from another
@@ -201,6 +207,12 @@ static char const *lp_scope_str(int scope)
 	}
 }
 
+/** Read lines from a file into an array of strings and lengths
+ *
+ * @param[out] out array of lp_name_t structs, must be freed after use.
+ * @param[in] path of file to read.
+ * @return the number of entries read, or < 0 on error.
+ */
 static int lp_names_file(lp_name_t **out, char const *path)
 {
 	FILE *file;
@@ -233,7 +245,7 @@ static int lp_names_file(lp_name_t **out, char const *path)
 			names = realloc(names, (sizeof(lp_name_t) * cnt) + 1);
 		}
 
-		DEBUG("[%i] %s", idx, p);
+		DEBUG2("[%i] %s", idx, p);
 		names[idx].len = len;
 		names[idx].name = p;
 
@@ -252,6 +264,10 @@ static int lp_names_file(lp_name_t **out, char const *path)
 	return idx;
 }
 
+/** Frees an array of lp_name_t structs.
+ *
+ * @param[in] names to free.
+ */
 static void lp_names_free(lp_name_t *names)
 {
 	lp_name_t *p = names;
@@ -265,6 +281,15 @@ static void lp_names_free(lp_name_t *names)
 	free(names);
 }
 
+/** Replaces to_find in in with subst.
+ *
+ * @param[in] out Buffer to write a copy of in with to_find substituted to subst.
+ * @param[in] outlen length of output buffer.
+ * @param[in] in String to perform substitutions on.
+ * @param[in] subst String to substitute.
+ * @
+ * @param[in] names to free.
+ */
 static char const *lp_strpst(char *out, size_t outlen, char const *in, size_t inlen,
 			     char const *subst, size_t subst_len, char to_find)
 {
@@ -294,7 +319,7 @@ static char const *lp_strpst(char *out, size_t outlen, char const *in, size_t in
 	return out;
 }
 
-static LDAP *lp_query_init(lp_thread_t *thread)
+static LDAP *lp_conn_init(lp_thread_t *thread)
 {
 	LDAP *ld;
 	int rc;
@@ -329,12 +354,15 @@ static LDAP *lp_query_init(lp_thread_t *thread)
 	return ld;
 }
 
-static void lp_query_finished(lp_thread_t *thread, LDAP *ld)
+static void lp_conn_close(LDAP **ld)
 {
-	ldap_unbind_s(ld);
+	if (!*ld) return;
+
+	ldap_unbind_s(*ld);
+	*ld = NULL;
 }
 
-static void lp_query_perform(lp_thread_t *thread, LDAP *ld)
+static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 {
 	int		i = 0, rc = 0, entry_count = 0;
 	char		*attribute, *dn, **values;
@@ -344,31 +372,26 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld)
 	char const	*filter_p = filter;
 	char const	*base_dn_p = base_dn;
 
-	assert(ld);
+	assert(thread && ld);
 
 	/* Perform substitutions */
-	if (do_subst) {
-		lp_name_t *name_p;
-
-		/* Replace the REPLACE_CHAR in filter with random string out of names_file */
-		name_p = &names[rand() % names_cnt];
-
+	if (subst) {
 		if (filter) {
 			filter_p = lp_strpst(thread->filter, thread->filter_len,
 					     filter, filter_len,
-					     name_p->name, name_p->len, REPLACE_CHAR);
+					     subst->name, subst->len, SUBST_CHAR);
 		}
 
 		base_dn_p = lp_strpst(thread->base_dn, thread->base_dn_len,
 				      base_dn, base_dn_len,
-				      name_p->name, name_p->len, REPLACE_CHAR);
+				      subst->name, subst->len, SUBST_CHAR);
 	}
 
 	TDEBUG("Searching in \"%s\" filter \"%s\" scope \"%s\"",
 	       base_dn_p, filter_p ? filter_p : "none", lp_scope_str(scope));
 
 	/* Search the directory */
-	rc =  ldap_search_s(ld, base_dn_p, scope, filter_p, NULL, 0, &search_result);
+	rc = ldap_search_s(ld, base_dn_p, scope, filter_p, NULL, 0, &search_result);
 	if (rc != LDAP_SUCCESS){
 		TERROR("ldap_search_ext_s: %s", ldap_err2string(rc));
 		thread->stats.error_search_fail++;
@@ -377,7 +400,7 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld)
 		return;
 	}
 
-	/* Save client CPU time */
+	/* Save client CPU time by not decoding the result */
 	if (decode_entry) {
 		/* Go through the search results by checking entries */
 		for (entry = ldap_first_entry(ld, search_result);
@@ -417,32 +440,34 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld)
 static void *enter_thread(void *arg)
 {
 	int i = 0;
-	LDAP *ld;
+	LDAP *ld = NULL;
 
 	lp_thread_t *thread = arg;
 	struct timeval elapsed;
 
-	TDEBUG("Starting new thread with %d runs", run_count);
+	TDEBUG("Starting new thread with %d searches", num_loops);
 
 	gettimeofday(&thread->stats.before, NULL);
 
-	if (rebind) {
-		for (i = 0; i < run_count; i++) {
-			ld = lp_query_init(thread);
-			if (!ld) continue;
+	for (i = 0; i < num_loops; i++) {
+		lp_name_t *subst = NULL;
 
-			lp_query_perform(thread, ld);
-			lp_query_finished(thread, ld);
-		}
-	} else {
-		ld = lp_query_init(thread);
-		if (!ld) goto finish;
+		if (!ld) ld = lp_conn_init(thread);
+		if (!ld) continue;
 
-		for (i = 0; i < run_count; i++) lp_query_perform(thread, ld);
-		lp_query_finished(thread, ld);
+		/* Replace the SUBST_CHAR in filter with random string out of names_file */
+		if (do_subst) subst = ordered ? &names[i] :
+						&names[rand() % names_cnt];
+
+		lp_query_perform(thread, ld, subst);
+
+		/* Rebind after every search */
+		if (rebind) lp_conn_close(&ld);
 	}
 
-finish:
+	/* Ensure we don't leak connections */
+	lp_conn_close(&ld);
+
 	gettimeofday(&thread->stats.after, NULL);
 	lp_timeval_sub(&thread->stats.after, &thread->stats.before, &elapsed);
 	TDEBUG("Thread exiting after: %lfs", TIMEVAL_TO_FLOAT(elapsed));
@@ -479,9 +504,13 @@ int main(int argc, char **argv)
 
 	static lp_stats_t	stats;
 
-	while ((c = getopt(argc, argv, "H:p:vs:SdD:w:b:f:l:t:hr:R")) != -1) switch(c) {
+	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hr:R")) != -1) switch(c) {
 	case 'H':
 		ldap_host = optarg;
+		break;
+
+	case 'o':
+		ordered = true;
 		break;
 
 	case 'p':
@@ -489,7 +518,7 @@ int main(int argc, char **argv)
 		break;
 
 	case 'v':
-		debug = true;
+		debug++;
 		break;
 
 	case 's':
@@ -538,7 +567,7 @@ int main(int argc, char **argv)
 		break;
 
 	case 'l':
-		run_count = atoi(optarg);
+		num_loops = atoi(optarg);
 		break;
 
 	case 't':
@@ -556,8 +585,7 @@ int main(int argc, char **argv)
 
 	case 'h':
 	case '?':
-		usage(argv[0]);
-		exit(0);
+		usage(argv[0], 0);
 
 	default:
 		assert(0);
@@ -565,7 +593,17 @@ int main(int argc, char **argv)
 
 	if (!base_dn) {
 		ERROR("No Base DN provided, use -b <base_dn>");
-		usage(argv[0]);
+		usage(argv[0], 64);
+	}
+
+	if (ordered && !do_subst) {
+		ERROR("List of names needed to perform ordered search");
+		usage(argv[0], 64);
+	}
+
+	if (do_subst && !strchr(base_dn, SUBST_CHAR) && !strchr(filter, SUBST_CHAR)) {
+		ERROR("No substitution chars (%c) found in filter or base DN", SUBST_CHAR);
+		usage(argv[0], 64);
 	}
 
 	/* Alloc memory for each of the threads */
@@ -597,13 +635,15 @@ int main(int argc, char **argv)
 		}
 	}
 
-	if (rebind) {
-		INFO("Performing %i searches, reconnecting after each",
-		     (run_count * num_pthreads));
-	} else {
-		INFO("Performing %i searches using %i connections",
-		     (run_count * num_pthreads), num_pthreads);
+	/* Override the defaults for threads and loops if were doing an ordered search */
+	if (ordered) {
+		num_pthreads = 1;
+		num_loops = names_cnt;
 	}
+
+	INFO("Performing %i search(es) total, with %i threads, %s",
+	     (num_loops * num_pthreads), num_pthreads,
+	     rebind ? "rebinding after each search" : "with persistent connections");
 
 	gettimeofday(&stats.before, NULL);
 	for (i = 0; i < num_pthreads; i++) {
