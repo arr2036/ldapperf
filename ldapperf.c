@@ -133,11 +133,17 @@ void usage(char const *path, int code)
 
 	printf("%s -b <base_dn> [options]\n", prog);
 	printf("  -v             Output more debugging information. Use multiple times to increase verbosity\n");
-	printf("  -s             Decode received entry (default no)\n");
+	printf("  -s             Search scope, one of (one, sub, "
+	/* Children is specific to OpenLDAP */
+#ifdef LDAP_SCOPE_CHILDREN
+	       "children, "
+#endif
+	       "base)\n");
 	printf("  -S             Print statistics after all queries have completed\n");
 	printf("  -H <host>      Host to connect to (default 127.0.0.1)\n");
 	printf("  -p <port>      Port to connect on (default 389)\n");
-	printf("  -o <ordered>   Search for each of the names in the -r <file> in order, using a single thread");
+	printf("  -o <ordered>   Search for each of the names in the -r <file> in order, using a single thread\n");
+	printf("  -d             Decode received entry (default no)\n");
 	printf("  -D <dn>        Bind DN\n");
 	printf("  -w <pasword>   Bind password\n");
 	printf("\nSearch options:\n");
@@ -195,13 +201,12 @@ static char const *lp_scope_str(int scope)
 	case LDAP_SCOPE_SUB:
 		return "sub";
 
-	case LDAP_SCOPE_BASE:
-		return "base";
-
 #ifdef LDAP_SCOPE_CHILDREN
 	case LDAP_SCOPE_CHILDREN:
 		return "children";
 #endif
+	case LDAP_SCOPE_BASE:
+		return "base";
 
 	default:
 		assert(0);
