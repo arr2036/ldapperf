@@ -40,7 +40,7 @@ Modes
 If an ``-r <file>`` is passed, all names from this file will be read into memory. 
 For each search a different name will be selected from from the list.
 
-The ``-b <base_dn> and ``-f <filter>`` (if set) strings are scanned for a 
+The ``-b <base_dn>`` and ``-f <filter>`` (if set) strings are scanned for a 
 ``REPLACE_CHAR`` by default ``@``, and this is replaced with the randomly picked
 name.
 
