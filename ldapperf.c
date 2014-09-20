@@ -92,7 +92,9 @@ typedef struct lp_name {
 #define TINFO(fmt, ...) do { if (debug >= 0) printf(VTC_BOLD "(%03i) " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define TERROR(fmt, ...) do { fprintf(stderr, VTC_RED "(%03i) ERROR: " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stderr); } while (0)
 
-#define SUBST_CHAR '@'						//!< The char to substitute in the filter and/or DN.
+#ifndef SUBST_CHAR
+#  define SUBST_CHAR '@'					//!< The char to substitute in the filter and/or DN.
+#endif
 
 int debug		= 0;					//!< Default configuration options.
 bool decode_entry	= false;				//!< Do a scan of the results return through the ldap server. This is client side !
@@ -630,7 +632,7 @@ int main(int argc, char **argv)
 		usage(argv[0], 64);
 	}
 
-	if (do_subst && !strchr(base_dn, SUBST_CHAR) && !strchr(filter, SUBST_CHAR)) {
+	if (do_subst && !strchr(base_dn, SUBST_CHAR) && (!filter || !strchr(filter, SUBST_CHAR))) {
 		ERROR("No substitution chars (%c) found in filter or base DN", SUBST_CHAR);
 		usage(argv[0], 64);
 	}
