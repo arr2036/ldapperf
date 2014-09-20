@@ -85,11 +85,11 @@ typedef struct lp_name {
 
 #define DEBUG(fmt, ...) do { if (debug > 0) printf(fmt "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
 #define DEBUG2(fmt, ...) do { if (debug > 1) printf(fmt "\n", ## __VA_ARGS__); fflush(stdout); } while (0)
-#define INFO(fmt, ...) do { printf(VTC_BOLD fmt "\n" VTC_RESET, ## __VA_ARGS__); fflush(stdout); } while (0)
+#define INFO(fmt, ...) do { if (debug >= 0) printf(VTC_BOLD fmt "\n" VTC_RESET, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define ERROR(fmt, ...) do { fprintf(stderr, VTC_RED "ERROR: " fmt "\n" VTC_RESET, ## __VA_ARGS__); fflush(stderr); } while (0)
 
 #define TDEBUG(fmt, ...) do { if (debug > 0) printf("(%03i) " fmt "\n", thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
-#define TINFO(fmt, ...) do { printf(VTC_BOLD "(%03i) " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
+#define TINFO(fmt, ...) do { if (debug >= 0) printf(VTC_BOLD "(%03i) " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stdout); } while (0)
 #define TERROR(fmt, ...) do { fprintf(stderr, VTC_RED "(%03i) ERROR: " fmt "\n" VTC_RESET, thread->number, ## __VA_ARGS__); fflush(stderr); } while (0)
 
 #define SUBST_CHAR '@'						//!< The char to substitute in the filter and/or DN.
@@ -147,6 +147,7 @@ void usage(char const *path, int code)
 	       "a name from -r <file>)\n", SUBST_CHAR);
 	printf("  -l <loops>     How many searches a thread should perform\n");
 	printf("  -t <threads>   How many threads we should spawn\n");
+	printf("  -q             Produce less verbose output\n");
 	printf("  -r <file>      List of names to use when searching\n");
 	printf("  -R             Rebind after every search operation (default no)\n");
 	printf("\nExample:\n");
@@ -483,6 +484,25 @@ static void lp_print_stats(lp_stats_t *stats)
 	lp_timeval_sub(&stats->after, &stats->before, &elapsed);
 	seconds = TIMEVAL_TO_FLOAT(elapsed);
 
+	/* Condensed stats output for scripting */
+	if (debug < 0) {
+		printf("time,success,success_s,search_fail,init_fail,bind_fail\n");
+		printf("%i,"
+		       "%" PRIu64 ","
+		       "%i,"
+		       "%" PRIu64 ","
+		       "%" PRIu64 ","
+		       "%" PRIu64 "\n",
+		       (int) seconds,
+		       stats->successful,
+		       (int) (stats->successful / seconds),
+		       stats->error_search_fail,
+		       stats->error_session_init,
+		       stats->error_bind_fail);
+		return;
+	}
+
+	/* Pretty stats output */
 	INFO("Statistics:");
 	INFO("\tTotal time (seconds)  : %lf", seconds);
 	INFO("\tSuccessful searches   : %" PRIu64, stats->successful);
@@ -504,7 +524,7 @@ int main(int argc, char **argv)
 
 	static lp_stats_t	stats;
 
-	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hr:R")) != -1) switch(c) {
+	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hqr:R")) != -1) switch(c) {
 	case 'H':
 		ldap_host = optarg;
 		break;
@@ -572,6 +592,10 @@ int main(int argc, char **argv)
 
 	case 't':
 		num_pthreads = atoi(optarg);
+		break;
+
+	case 'q':
+		debug--;
 		break;
 
 	case 'r':
