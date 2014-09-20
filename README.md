@@ -34,8 +34,8 @@ Example:
 Modes
 -----
 
-Substitution mode
-^^^^^^^^^^^^^^^^^
+### Substitution mode
+
 
 If an ``-r <file>`` is passed, all names from this file will be read into memory. 
 For each search a different name will be selected from from the list.
@@ -46,8 +46,7 @@ name.
 
 This is useful for checking random access to objects within the directory.
 
-Ordered substitution mode
-^^^^^^^^^^^^^^^^^^^^^^^^^
+### Ordered substitution mode
 
 Some LDAP backends or directories have multiple levels of caching between the on
 disk representation of the objects and the LDAP encoder. If you want to test the
@@ -60,8 +59,8 @@ In ordered mode, searches will be performed for each name in the file
 sequentially. ``-l <loops>`` and ``-t <threads>`` will be overidden, with loops 
 being set to the number ofnames in the file and threads being set to one.
 
-No substitution mode
-^^^^^^^^^^^^^^^^^^^^
+### No substitution mode
+
 
 If you want to check the performance of the query cache don't pass ``-r <file>``
 and set ``-b <base_dn>`` to the DN of an object, and pass ``-s base``.
