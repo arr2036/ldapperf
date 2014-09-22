@@ -44,6 +44,7 @@
 #include <sys/time.h>
 
 /* OpenLDAP or other RFC compliant library */
+#define LDAP_DEPRECATED 1
 #include <ldap.h>
 
 /* Every system should have pthreads */
@@ -333,7 +334,7 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 	int rc;
 
 	/* Initialize the LDAP session */
-	ld = ldap_init(ldap_host, ldap_port);
+	ld = ldap_open(ldap_host, ldap_port);
 	if (!ld) {
 		TERROR("LDAP session initialization failed");
 		thread->stats.error_session_init++;
@@ -352,7 +353,7 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 		if (rc != LDAP_SUCCESS ){
 			TERROR("ldap_simple_bind_s: %s", ldap_err2string(rc));
 			thread->stats.error_bind_fail++;
-			ldap_unbind_s(ld);
+			ldap_unbind(ld);
 			return NULL;
 		}
 
@@ -366,7 +367,7 @@ static void lp_conn_close(LDAP **ld)
 {
 	if (!*ld) return;
 
-	ldap_unbind_s(*ld);
+	ldap_unbind(*ld);
 	*ld = NULL;
 }
 
