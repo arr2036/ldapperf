@@ -31,9 +31,12 @@
 
 # Random
 .DS_Store
+*.swp
 
 # Test filtes
 test_*
+*.png
+*.svg
 
 # Build products
 ldapperf
