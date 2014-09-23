@@ -231,7 +231,7 @@ static int lp_names_file(lp_name_t **out, char const *path)
 	size_t max = 0;
 	int idx = 0, cnt = 0;
 
-	lp_name_t *names;
+	lp_name_t *names = NULL;
 
 	file = fopen(path, "r");
 	if (!file) {
