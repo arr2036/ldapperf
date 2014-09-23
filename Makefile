@@ -1,5 +1,5 @@
 ldapperf: ldapperf.c
-	gcc -Wall -lldap -lpthread -llber -g -o $@ $<
+	cc -Wall -o $@ $< -lldap -lpthread -llber 
 
 tar: clean
 	tar -cvf ldapperf.tar *
