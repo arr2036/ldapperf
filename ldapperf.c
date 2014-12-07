@@ -376,7 +376,6 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 	int		i = 0, rc = 0, entry_count = 0;
 	char		*attribute, *dn;
 	struct berval	**values;
-	BerElement	*ber;
 
 	LDAPMessage	*search_result = NULL, *entry;
 	char const	*filter_p = filter;
@@ -419,6 +418,8 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 		for (entry = ldap_first_entry(ld, search_result);
 		     entry != NULL;
 		     entry  = ldap_next_entry(ld, entry)) {
+		     	BerElement *ber = NULL;
+
 			if ((dn = ldap_get_dn(ld, entry)) != NULL ){
 				TDEBUG("Decoding object with dn: %s", dn);
 				ldap_memfree(dn);
@@ -435,9 +436,9 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 				}
 				ldap_value_free_len(values);
 			}
+			ber_free(ber, 0);
 			ldap_memfree(attribute);
 		}
-		ber_free(ber, 0);
 	}
 
 	ldap_msgfree(search_result);
