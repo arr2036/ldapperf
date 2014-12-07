@@ -103,8 +103,7 @@ bool rebind		= false;				//!< Rebind after every search.
 bool do_stats		= false;				//!< Print statistics at the end of the test.
 bool ordered		= false;				//!< Perform searches for names from -r <file> in order to prime the cache.
 
-char const *ldap_host	= "127.0.0.1";				//!< The host where the ldap server resides.
-int ldap_port		= 389;					//!< The port to connect to.
+char const *ldap_uri	= "ldap://127.0.0.1";			//!< The host where the ldap server resides.
 char const *bind_dn	= NULL;					//!< Manager bind DN.
 char const *password	= NULL;					//!< And the password.
 
@@ -121,7 +120,9 @@ int scope		= LDAP_SCOPE_ONE;			//!< Scope of the search,
 int num_loops		= 10;					//!< How many searches to execute.
 int num_pthreads	= 5;					//!< How many threads there should be.
 char *names_file        = NULL;					//!< File containing names to substitute.
-int time_out		= 10; 					//!< 10 second connection/search time_out,
+struct timeval timeout = {
+	.tv_usec = 10 						//!< 10 second connection/search time_out,
+};
 int version		= LDAP_VERSION3;
 
 lp_name_t *names	= NULL;
@@ -143,8 +144,7 @@ void usage(char const *path, int code)
 #endif
 	       "base)\n");
 	printf("  -S             Print statistics after all queries have completed\n");
-	printf("  -H <host>      Host to connect to (default 127.0.0.1)\n");
-	printf("  -p <port>      Port to connect on (default 389)\n");
+	printf("  -H <host>      Host to connect to (default ldap://127.0.0.1)\n");
 	printf("  -o <ordered>   Search for each of the names in the -r <file> in order, using a single thread\n");
 	printf("  -d             Decode received entry (default no)\n");
 	printf("  -D <dn>        Bind DN\n");
@@ -334,16 +334,16 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 	int rc;
 
 	/* Initialize the LDAP session */
-	ld = ldap_open(ldap_host, ldap_port);
-	if (!ld) {
-		TERROR("LDAP session initialization failed");
+	rc = ldap_initialize(&ld, ldap_uri);
+	if (rc != LDAP_SUCCESS) {
+		TERROR("LDAP session initialization failed: %s", ldap_err2string(rc));
 		thread->stats.error_session_init++;
 		return NULL;
 	}
 
 	/* Set LDAP version to 3 and set connection time_out (in sec).*/
 	ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version);
-	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &time_out);
+	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &timeout.tv_usec);
 
 	TDEBUG("LDAP session initialised");
 
@@ -353,7 +353,7 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 		if (rc != LDAP_SUCCESS ){
 			TERROR("ldap_simple_bind_s: %s", ldap_err2string(rc));
 			thread->stats.error_bind_fail++;
-			ldap_unbind(ld);
+			ldap_unbind_ext(ld, NULL, NULL);
 			return NULL;
 		}
 
@@ -367,14 +367,15 @@ static void lp_conn_close(LDAP **ld)
 {
 	if (!*ld) return;
 
-	ldap_unbind(*ld);
+	ldap_unbind_ext(*ld, NULL, NULL);
 	*ld = NULL;
 }
 
 static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 {
 	int		i = 0, rc = 0, entry_count = 0;
-	char		*attribute, *dn, **values;
+	char		*attribute, *dn;
+	struct berval	**values;
 	BerElement	*ber;
 
 	LDAPMessage	*search_result = NULL, *entry;
@@ -400,7 +401,7 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 	       base_dn_p, filter_p ? filter_p : "none", lp_scope_str(scope));
 
 	/* Search the directory */
-	rc = ldap_search_s(ld, base_dn_p, scope, filter_p, NULL, 0, &search_result);
+	rc = ldap_search_ext_s(ld, base_dn_p, scope, filter_p, NULL, 0, NULL, NULL, &timeout, 0, &search_result);
 	if (rc != LDAP_SUCCESS){
 		TERROR("ldap_search_ext_s: %s", ldap_err2string(rc));
 		thread->stats.error_search_fail++;
@@ -409,8 +410,11 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 		return;
 	}
 
+	entry_count = ldap_count_entries(ld, search_result);
+	TDEBUG("Search completed successfully. Got %d entries", entry_count);
+
 	/* Save client CPU time by not decoding the result */
-	if (decode_entry) {
+	if (entry_count && decode_entry) {
 		/* Go through the search results by checking entries */
 		for (entry = ldap_first_entry(ld, search_result);
 		     entry != NULL;
@@ -424,20 +428,17 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 			     attribute != NULL;
 			     attribute = ldap_next_attribute(ld, entry, ber)) {
 				/* Get values and print.  Assumes all values are strings. */
-				if ((values = ldap_get_values(ld, entry, attribute)) != NULL){
-					for (i = 0; values[i] != NULL; i++) {
-						TDEBUG("\t%s: %s", attribute, values[i] );
+				if ((values = ldap_get_values_len(ld, entry, attribute)) != NULL){
+					for (i = 0; values[i]->bv_val != NULL; i++) {
+						TDEBUG("\t%s: %s", attribute, values[i]->bv_val);
 					}
 				}
-				ldap_value_free(values);
+				ldap_value_free_len(values);
 			}
 			ldap_memfree(attribute);
 		}
 		ber_free(ber, 0);
 	}
-	entry_count = ldap_count_entries(ld, search_result);
-
-	TDEBUG("Search completed successfully. Got %d entries", entry_count);
 
 	ldap_msgfree(search_result);
 
@@ -534,15 +535,11 @@ int main(int argc, char **argv)
 
 	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hqr:R")) != -1) switch(c) {
 	case 'H':
-		ldap_host = optarg;
+		ldap_uri = optarg;
 		break;
 
 	case 'o':
 		ordered = true;
-		break;
-
-	case 'p':
-		ldap_port = atoi(optarg);
 		break;
 
 	case 'v':
