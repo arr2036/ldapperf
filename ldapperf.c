@@ -349,7 +349,7 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 
 	/* Bind to the server */
 	if (bind_dn && password) {
-		rc = ldap_simple_bind_s(ld, bind_dn, password );
+		rc = ldap_simple_bind_s(ld, bind_dn, password);
 		if (rc != LDAP_SUCCESS ){
 			TERROR("ldap_simple_bind_s: %s", ldap_err2string(rc));
 			thread->stats.error_bind_fail++;
@@ -416,8 +416,8 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 	if (entry_count && decode_entry) {
 		/* Go through the search results by checking entries */
 		for (entry = ldap_first_entry(ld, search_result);
-		     entry != NULL;
-		     entry  = ldap_next_entry(ld, entry)) {
+		     entry;
+		     entry = ldap_next_entry(ld, entry)) {
 		     	BerElement *ber = NULL;
 
 			if ((dn = ldap_get_dn(ld, entry)) != NULL ){
@@ -426,15 +426,15 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 			}
 
 			for (attribute = ldap_first_attribute(ld, entry, &ber);
-			     attribute != NULL;
+			     attribute;
 			     attribute = ldap_next_attribute(ld, entry, ber)) {
 				/* Get values and print.  Assumes all values are strings. */
 				if ((values = ldap_get_values_len(ld, entry, attribute)) != NULL){
 					for (i = 0; values[i]->bv_val != NULL; i++) {
 						TDEBUG("\t%s: %s", attribute, values[i]->bv_val);
 					}
+					ldap_value_free_len(values);
 				}
-				ldap_value_free_len(values);
 			}
 			ber_free(ber, 0);
 			ldap_memfree(attribute);
