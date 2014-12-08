@@ -162,6 +162,8 @@ void usage(char const *path, int code)
 	printf("\nExample:\n");
 	printf("  %s -H ldap://127.0.0.1 -D \"cn=manager,dc=example,dc=org\" -w \"letmein\" "
 	       "-b \"dc=example,dc=org\" -s\n", prog);
+	printf("\nlibldap vendor: %s, version: %i.%i.%i", LDAP_VENDOR_NAME,
+	       LDAP_VENDOR_VERSION_MAJOR, LDAP_VENDOR_VERSION_MINOR, LDAP_VENDOR_VERSION_PATCH);
 
 	exit(code);
 }
