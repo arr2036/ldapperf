@@ -160,7 +160,7 @@ void usage(char const *path, int code)
 	printf("  -r <file>      List of names to use when searching\n");
 	printf("  -R             Rebind after every search operation (default no)\n");
 	printf("\nExample:\n");
-	printf("  %s -H 127.0.0.1 -p 389 -D \"cn=manager,dc=example,dc=org\" -w \"letmein\" "
+	printf("  %s -H ldap://127.0.0.1 -D \"cn=manager,dc=example,dc=org\" -w \"letmein\" "
 	       "-b \"dc=example,dc=org\" -s\n", prog);
 
 	exit(code);
@@ -431,7 +431,8 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 				/* Get values and print.  Assumes all values are strings. */
 				if ((values = ldap_get_values_len(ld, entry, attribute)) != NULL){
 					for (i = 0; values[i]->bv_val != NULL; i++) {
-						TDEBUG("\t%s: %s", attribute, values[i]->bv_val);
+						TDEBUG("\t%s: %.*s", attribute, (int)values[i]->bv_len,
+						       values[i]->bv_val);
 					}
 					ldap_value_free_len(values);
 				}
@@ -536,6 +537,10 @@ int main(int argc, char **argv)
 
 	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hqr:R")) != -1) switch(c) {
 	case 'H':
+		if (!((strncmp(optarg, "ldap://", 7) == 0) || (strncmp(optarg, "ldaps://", 8) == 0))) {
+			ERROR("Host must be specified with an LDAP URI e.g. ldap://127.0.0.1:384");
+			exit(1);
+		}
 		ldap_uri = optarg;
 		break;
 
