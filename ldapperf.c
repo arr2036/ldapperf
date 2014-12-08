@@ -121,7 +121,7 @@ int num_loops		= 10;					//!< How many searches to execute.
 int num_pthreads	= 5;					//!< How many threads there should be.
 char *names_file        = NULL;					//!< File containing names to substitute.
 struct timeval timeout = {
-	.tv_usec = 10 						//!< 10 second connection/search time_out,
+	.tv_sec = 10 						//!< 10 second connection/search time_out,
 };
 int version		= LDAP_VERSION3;
 
@@ -343,7 +343,7 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 
 	/* Set LDAP version to 3 and set connection time_out (in sec).*/
 	ldap_set_option(ld, LDAP_OPT_PROTOCOL_VERSION, &version);
-	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &timeout.tv_usec);
+	ldap_set_option(ld, LDAP_OPT_NETWORK_TIMEOUT, &timeout.tv_sec);
 
 	TDEBUG("LDAP session initialised");
 
