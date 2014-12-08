@@ -535,7 +535,7 @@ int main(int argc, char **argv)
 
 	static lp_stats_t	stats;
 
-	while ((c = getopt(argc, argv, "H:op:vs:SdD:w:b:f:l:t:hqr:R")) != -1) switch(c) {
+	while ((c = getopt(argc, argv, "H:ovs:SdD:w:b:f:l:t:hqr:R")) != -1) switch(c) {
 	case 'H':
 		if (!((strncmp(optarg, "ldap://", 7) == 0) || (strncmp(optarg, "ldaps://", 8) == 0))) {
 			ERROR("Host must be specified with an LDAP URI e.g. ldap://127.0.0.1:384");
