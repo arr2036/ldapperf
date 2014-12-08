@@ -367,7 +367,7 @@ static void lp_conn_close(LDAP **ld)
 {
 	if (!*ld) return;
 
-	ldap_unbind_ext(*ld, NULL, NULL);
+	ldap_unbind_ext_s(*ld, NULL, NULL);
 	*ld = NULL;
 }
 
