@@ -3,8 +3,7 @@ ldapperf
 
 Very simple, threaded, LDAP directory performance checker/benchmark.
 
-This should compile on any POSIX-2001 system which has pthreads, and an RFC 1823
-compliant LDAP library.
+This should compile on any POSIX-2001 system, which has pthreads and OpenLDAP libldap.
 
 ```text
 ldapperf -b <base_dn> [options]
