@@ -373,7 +373,7 @@ static void lp_conn_close(LDAP **ld)
 	*ld = NULL;
 }
 
-static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
+static int lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 {
 	int		i = 0, rc = 0, entry_count = 0;
 	char		*attribute, *dn;
@@ -408,7 +408,7 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 		thread->stats.error_search_fail++;
 
 		ldap_msgfree(search_result);
-		return;
+		return -1;
 	}
 
 	entry_count = ldap_count_entries(ld, search_result);
@@ -448,7 +448,7 @@ static void lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 
 	thread->stats.successful++;
 
-	return;
+	return 0;
 }
 
 static void *enter_thread(void *arg)
@@ -473,7 +473,10 @@ static void *enter_thread(void *arg)
 		if (do_subst) subst = ordered ? &names[i] :
 						&names[rand() % names_cnt];
 
-		lp_query_perform(thread, ld, subst);
+		if (lp_query_perform(thread, ld, subst) < 0) {
+			lp_conn_close(&ld);
+			continue;
+		}
 
 		/* Rebind after every search */
 		if (rebind) lp_conn_close(&ld);
