@@ -352,11 +352,11 @@ static LDAP *lp_conn_init(lp_thread_t *thread)
 	/* Bind to the server */
 	if (bind_dn && password) {
 		struct berval cred;
-		cred.bv_val = (char *) password;
-		cred.bv_len = strlen( password );
+		cred.bv_val = (char *)password;
+		cred.bv_len = strlen(password);
 
 		rc = ldap_sasl_bind_s(ld, bind_dn, LDAP_SASL_SIMPLE, &cred, NULL, NULL, NULL);
-		if (rc != LDAP_SUCCESS ){
+		if (rc != LDAP_SUCCESS){
 			TERROR("ldap_sasl_bind_s: %s", ldap_err2string(rc));
 			thread->stats.error_bind_fail++;
 			ldap_unbind_ext(ld, NULL, NULL);
