@@ -685,6 +685,12 @@ int main(int argc, char **argv)
 	     (num_loops * num_pthreads), num_pthreads,
 	     rebind ? "rebinding after each search" : "with persistent connections");
 
+	/* Work around initialisation race in libldap */
+	{
+		LDAP *ld;
+		ldap_initialize(&ld, "");
+	}
+
 	gettimeofday(&stats.before, NULL);
 	for (i = 0; i < num_pthreads; i++) {
 		threads[i].number = i;
