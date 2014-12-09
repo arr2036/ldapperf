@@ -121,7 +121,7 @@ Pull requests welcome, so long as they're pretty and useful.
 Author
 ------
 
-Writte by Arran Cudbard-Bell of the FreeRADIUS project.
+Written by Arran Cudbard-Bell of the FreeRADIUS project.
 
 Based on ldapbench 0.2 by Geerd-Dietger Hoffman, though they now share little
 or no code.
