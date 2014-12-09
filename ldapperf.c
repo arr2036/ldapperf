@@ -144,7 +144,7 @@ void usage(char const *path, int code)
 #endif
 	       "base)\n");
 	printf("  -S             Print statistics after all queries have completed\n");
-	printf("  -H <host>      Host to connect to (default ldap://127.0.0.1)\n");
+	printf("  -H <uri>       Host to connect to (default ldap://127.0.0.1)\n");
 	printf("  -o <ordered>   Search for each of the names in the -r <file> in order, using a single thread\n");
 	printf("  -d             Decode received entry (default no)\n");
 	printf("  -D <dn>        Bind DN\n");
