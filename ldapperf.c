@@ -381,7 +381,6 @@ static int lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 {
 	int		i = 0, rc = 0, entry_count = 0;
 	char		*attribute, *dn;
-	struct berval	**values;
 
 	LDAPMessage	*search_result = NULL, *entry;
 	char const	*filter_p = filter;
@@ -434,17 +433,26 @@ static int lp_query_perform(lp_thread_t *thread, LDAP *ld, lp_name_t *subst)
 			for (attribute = ldap_first_attribute(ld, entry, &ber);
 			     attribute;
 			     attribute = ldap_next_attribute(ld, entry, ber)) {
+				int		count;
+				struct berval	**values;
+
+				values = ldap_get_values_len(ld, entry, attribute);
+				if (!values) goto next;
+
+				count = ldap_count_values_len(values);
+				if (!count) goto next;
+
 				/* Get values and print.  Assumes all values are strings. */
-				if ((values = ldap_get_values_len(ld, entry, attribute)) != NULL){
-					for (i = 0; values[i]->bv_val != NULL; i++) {
-						TDEBUG("\t%s: %.*s", attribute, (int)values[i]->bv_len,
-						       values[i]->bv_val);
-					}
-					ldap_value_free_len(values);
+				for (i = 0; i < count; i++) {
+					TDEBUG("\t%s: %.*s", attribute, (int)values[i]->bv_len,
+					       values[i]->bv_val);
 				}
+
+			next:
+				ldap_value_free_len(values);
+				ldap_memfree(attribute);
 			}
 			ber_free(ber, 0);
-			ldap_memfree(attribute);
 		}
 	}
 
