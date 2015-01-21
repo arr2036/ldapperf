@@ -285,9 +285,10 @@ static void lp_names_free(lp_name_t *names)
 
 	if (!names) return;
 
-	do {
+	while (p->name) {
 		free(p->name);
-	} while ((++p)->name);
+		p++;
+	};
 
 	free(names);
 }
