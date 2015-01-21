@@ -729,9 +729,9 @@ int main(int argc, char **argv)
 	gettimeofday(&stats.after, NULL);
 	DEBUG("... All threads done");
 
-	lp_names_free(names);
-
 	if (do_stats) lp_print_stats(&stats);
+
+	lp_names_free(names);
 
 	/* Any errors means we exit with a none zero code */
 	if ((stats.error_session_init > 0) ||
