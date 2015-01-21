@@ -253,7 +253,7 @@ static int lp_names_file(lp_name_t **out, char const *path)
 
 		if (idx == cnt) {
 			cnt += 1000;
-			names = realloc(names, (sizeof(lp_name_t) * cnt) + 1);
+			names = realloc(names, sizeof(lp_name_t) * (cnt+1));
 		}
 
 		DEBUG2("[%i] %s", idx, p);
