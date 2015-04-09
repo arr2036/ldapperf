@@ -115,7 +115,7 @@ time,success,success_s,search_fail,init_fail,bind_fail
 Contributing
 ------------
 
-Pull requests welcome, so long as they're pretty and useful.
+Pull requests welcome, so long as they're well formatted and useful.
 
 Author
 ------
